@@ -102,6 +102,12 @@ A simulation only checks the assumptions it encodes. Field reports are what matt
 
 CI runs the tests, builds the zip (`scripts/build-release.sh`) and publishes the release. Tags with a suffix (`v0.7.0-rc1`) become pre-releases.
 
+## How this was made
+
+The patch, the analysis, the tests and the release pipeline were written with the help of an AI assistant (Claude, by Anthropic). Every version was tested by a person on a real device (InkPad Color 3), and the crash.logs were fed back into the next iteration.
+
+Several of the AI's assumptions turned out wrong on real hardware and were corrected. [docs/analysis.md](docs/analysis.md#approaches-that-failed) lists the approaches that failed and why. Treat the simulated-only items in [What's verified](#whats-verified) accordingly, and please report what you see on your device.
+
 ## Credits
 
 - **[Lomig](https://github.com/Lomig/koreader-pocketbook-wifi):** found the netagent teardown and much of what's documented about the PocketBook network stack. This patch started from his userpatches.

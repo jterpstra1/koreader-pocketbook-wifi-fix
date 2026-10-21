@@ -96,7 +96,9 @@ A simulation only checks the assumptions it encodes. Field reports are what matt
 
 1. Bump `PATCH_VERSION` in the patch.
 2. Add a `## vX.Y.Z` section to `CHANGELOG.md`.
-3. Commit, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. Commit and push, then either:
+   - push a tag: `git tag vX.Y.Z && git push origin vX.Y.Z`, or
+   - go to *Actions → CI → Run workflow* and enter `vX.Y.Z` as `release_tag`. This creates the tag on that commit.
 
 CI runs the tests, builds the zip (`scripts/build-release.sh`) and publishes the release. Tags with a suffix (`v0.7.0-rc1`) become pre-releases.
 

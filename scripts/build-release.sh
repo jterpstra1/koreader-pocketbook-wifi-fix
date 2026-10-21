@@ -32,6 +32,8 @@ if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
 fi
 
 rm -rf "$out"
+mkdir -p "$out"
+out=$(cd "$out" && pwd) # absolute: zip runs from inside the staging dir
 stage="$out/stage"
 mkdir -p "$stage/applications/koreader/patches"
 # Only the patch (plus its license, which KOReader ignores: not a .lua file),

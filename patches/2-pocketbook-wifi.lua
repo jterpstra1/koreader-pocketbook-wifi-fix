@@ -365,8 +365,8 @@ end
 -- NOTE: Hook Device:_beforeSuspend()/_afterResume() rather than
 --       UIManager.event_handlers.Suspend/Resume: every suspend path ends up
 --       there (it's what broadcasts the Suspend event and logs "Inhibiting
---       user input"), while wrapping the handler table proved unreliable in
---       the field (0.6.1: the wrapper never ran).
+--       user input"), and plugins can't swap it out the way they can replace
+--       the handler table.
 local orig_beforeSuspend = Device._beforeSuspend
 Device._beforeSuspend = function(...)
     local was_connecting = NetworkMgr.pending_connection

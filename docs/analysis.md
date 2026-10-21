@@ -55,9 +55,12 @@ So `net off` (which Lomig's teardown uses) must not be part of KOReader's "off".
 - **Off → on:** no prompt, and `NetConnect` took 1516 ms. Turning off ran `disconnect` in the background (3.25 s) with no UI freeze.
 - **Manual kosync push:** connected, then `afterWifiAction` ran 6 s later, and the radio was down 5 s after that.
 - **Exit:** the radio was powered down. The synchronous `netagent disconnect` took ~3.6 s here, which delays a restart by that much.
-- **Sleep (0.5.0): failed.** `Suspend` was logged (`Inhibiting user input`), and then nothing until the wake 81 s later. I first read this as the firmware freezing KOReader before the delayed power-down could run.
-- **Sleep (0.6.1): failed again**, even though 0.6.1 powers down synchronously in the wrapped `UIManager.event_handlers.Suspend`. Its log line never appeared, although `_beforeSuspend()` clearly ran: the Suspend broadcast and `Inhibiting user input` are both logged. So either the wrapper wasn't in the call chain, or its condition was silently false.
-- **0.6.2** hooks `Device:_beforeSuspend()` and `Device:_afterResume()` directly, and logs its decision on every sleep. Whether the 0.5.0 failure was the freeze or the same wrapper problem is unknown.
+- **Sleep tests with 0.5.0 and 0.6.1: no power-down.** It turned out the tester had unticked "When going to background or sleep". The patch then skips the power-down, and both versions did so without logging anything.
+- Before that came to light, I misread the logs twice: first as the firmware freezing KOReader before a delayed power-down could run, then as the wrapped `UIManager.event_handlers.Suspend` never being called. Neither is supported by evidence.
+- **0.6.2:**
+  - Logs its decision (setting, who turned Wi-Fi on, radio and association state) on every sleep.
+  - Powers down synchronously from `Device:_beforeSuspend()`, which is robust either way.
+- **Lesson:** a branch that does nothing should still log why.
 - **0.6.0** powers down synchronously in the `Suspend` handler, with `WiFiPower(0)` + `netagent wifi off` and no `disconnect`. This is the same thing PocketBook does when its own picker is cancelled, and connects afterwards worked in the logs. Exit uses the same path, so the 3.6 s exit delay is gone.
 - **A failed connect left no teardown in the log (0.5.0).** In the same log, a `NetConnect` failure (flaky hotspot, picker cancelled) was followed by no `turnOffWifi()` at all. The likely cause is a caller that ignores `turnOnWifi()`'s `false`, such as a plugin's own Wi-Fi toggle. The picker's own `wifi off` covered it that time. Since 0.6.1, `turnOnWifi()` powers down by itself on failure.
 - **Not yet observed:** 0.6.x on a device, and the inactivity timer.

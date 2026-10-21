@@ -2,8 +2,8 @@
 
 ## v0.6.2
 
-- Power down on sleep from `Device:_beforeSuspend()` instead of wrapping `UIManager.event_handlers.Suspend`. On an InkPad Color 3, 0.6.1's handler wrapper never ran on sleep.
-- Log why Wi-Fi was or wasn't powered down on each sleep, and whether KOReader turned Wi-Fi on itself.
+- Log why Wi-Fi was or wasn't powered down on each sleep, including the "When going to background or sleep" setting and whether KOReader turned Wi-Fi on itself. Two field "failures" turned out to be that setting being unticked, which used to skip the power-down silently.
+- Power down on sleep from `Device:_beforeSuspend()` instead of wrapping `UIManager.event_handlers.Suspend`. Every suspend path goes through it, and plugins can't replace it.
 
 ## v0.6.1
 

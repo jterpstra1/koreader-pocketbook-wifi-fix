@@ -57,7 +57,7 @@ Verified on an **InkPad Color 3 (U743k3.6.10.2854)** with KOReader 2026.07.1, fr
 | Off → on again: no prompt, connects in ~1.5 s | ✅ |
 | Wi-Fi off ~6 s after a manual progress-sync push ("Action when done with Wi-Fi: Turn off") | ✅ |
 | Wi-Fi off on exit (only if KOReader turned it on) | ✅ (0.5.0); 0.6.0 makes it faster |
-| Wi-Fi off on sleep / cover close | ❌ in 0.5.0 and 0.6.1 (the power-down never ran on sleep); 🧪 0.6.2 hooks `Device:_beforeSuspend()` and logs its decision, needs re-test |
+| Wi-Fi off on sleep / cover close | 🧪 needs a test with the setting enabled (earlier tests had "When going to background or sleep" unticked) |
 | "Disable Wi-Fi when inactive" on PocketBook | 🧪 simulated only |
 | Any other model or firmware | ❓ please report |
 

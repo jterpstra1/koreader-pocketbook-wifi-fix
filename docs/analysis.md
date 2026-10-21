@@ -51,6 +51,12 @@ netagent echoes every invocation into `crash.log` (`netagent called with paramet
 
 So `net off` (which Lomig's teardown uses) must not be part of KOReader's "off".
 
+**Final design**, from a crash.log with `net off` removed:
+- **Off → on:** no prompt, and `NetConnect` took 1516 ms. Turning off ran `disconnect` in the background (3.25 s) with no UI freeze.
+- **Manual kosync push:** connected, then `afterWifiAction` ran 6 s later, and the radio was down 5 s after that.
+- **Exit:** the radio was powered down. The synchronous `netagent disconnect` took ~3.6 s here, which delays a restart by that much.
+- **Not yet observed:** the power-down on sleep, and the inactivity timer.
+
 ## 4. Approaches that failed
 
 All of these were tried on the InkPad Color 3. Each one gave way to the next because of a crash.log.

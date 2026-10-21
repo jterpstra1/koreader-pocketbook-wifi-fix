@@ -54,7 +54,10 @@ Verified on an **InkPad Color 3 (U743k3.6.10.2854)** with KOReader 2026.07.1, fr
 | Stock `NetConnect()` connects silently to a known network in ~1.5 s | ✅ |
 | `netagent net off` disables networking system-wide, causing the "needs an Internet connection" prompt (so the patch no longer uses it) | ✅ |
 | No UI freeze on Wi-Fi off | ✅ |
-| Wi-Fi off after a manual push, on sleep, on exit | 🧪 simulated only |
+| Off → on again: no prompt, connects in ~1.5 s | ✅ |
+| Wi-Fi off ~6 s after a manual progress-sync push ("Action when done with Wi-Fi: Turn off") | ✅ |
+| Wi-Fi off on exit (only if KOReader turned it on) | ✅ |
+| Wi-Fi off on sleep / cover close | 🧪 simulated only |
 | "Disable Wi-Fi when inactive" on PocketBook | 🧪 simulated only |
 | Any other model or firmware | ❓ please report |
 

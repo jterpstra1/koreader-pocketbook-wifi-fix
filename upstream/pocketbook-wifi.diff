@@ -1,0 +1,90 @@
+diff --git a/frontend/device/pocketbook/device.lua b/frontend/device/pocketbook/device.lua
+index 34aa654..52239c8 100644
+--- a/frontend/device/pocketbook/device.lua
++++ b/frontend/device/pocketbook/device.lua
+@@ -29,6 +29,7 @@ local PocketBook = Generic:extend{
+     isPocketBook = yes,
+     hasOTAUpdates = yes,
+     hasWifiToggle = yes,
++    hasFastWifiStatusQuery = yes,
+     isTouchDevice = yes,
+     hasKeys = yes,
+     hasFrontlight = yes,
+@@ -379,32 +380,72 @@ function PocketBook:initNetworkManager(NetworkMgr)
+         end
+     end
+ 
++    local NETAGENT = "/ebrmain/bin/netagent"
++    local has_netagent = util.fileExists(NETAGENT)
++
++    -- The Wi-Fi interface (eth0 on the devices we know of) vanishes when the radio is powered down.
++    local function findInterface()
++        for __, name in ipairs({ "eth0", "wlan0" }) do
++            if util.directoryExists("/sys/class/net/" .. name .. "/wireless") then
++                return name
++            end
++        end
++    end
++    local wifi_iface = findInterface()
++
++    local function isAssociated()
++        return band(inkview.QueryNetwork(), C.NET_CONNECTED) ~= 0
++    end
++
+     function NetworkMgr:turnOnWifi(complete_callback)
+         inkview.WiFiPower(1)
+-        if inkview.NetConnect(nil) == C.NET_OK then
+-            keepWifiAlive()
+-        else
++        -- NOTE: Connects to a known network (~1.5s on an InkPad Color 3), or shows the system network picker.
++        if inkview.NetConnect(nil) ~= C.NET_OK then
+             logger.info("NetConnect failed")
++            -- Let the caller abort the attempt (and power the radio down) right away,
++            -- instead of after the connectivity check times out.
++            return false
+         end
++        keepWifiAlive()
+         if complete_callback then
+             complete_callback()
+         end
+     end
+ 
+     function NetworkMgr:turnOffWifi(complete_callback)
++        UIManager:unschedule(keepWifiAlive)
++        -- NetDisconnect() only drops the association, the radio stays up.
++        -- NOTE: Not `netagent net off`: that disables networking system-wide,
++        --       and the next NetConnect() then asks "The application needs an Internet connection".
+         inkview.NetDisconnect()
++        inkview.WiFiPower(0)
++        -- Some units keep the radio up after WiFiPower(0) alone.
++        if has_netagent then
++            os.execute(NETAGENT .. " wifi off >/dev/null 2>&1")
++        end
+         if complete_callback then
+             complete_callback()
+         end
+     end
+ 
++    -- Radio state, not association state: the radio can be up and unassociated (and draining the battery).
+     function NetworkMgr:isWifiOn()
+-        return band(inkview.QueryNetwork(), C.NET_CONNECTED) ~= 0
++        wifi_iface = findInterface() or wifi_iface
++        if not wifi_iface then
++            return isAssociated()
++        end
++        -- NOTE: Missing file when the radio is off, otherwise e.g. "0x1003"; bit 0 is IFF_UP.
++        local flags = tonumber(util.readFromFile("/sys/class/net/" .. wifi_iface .. "/flags", "r") or "")
++        return flags ~= nil and band(flags, 0x1) ~= 0
++    end
++
++    function NetworkMgr:getNetworkInterfaceName()
++        return wifi_iface or "eth0"
+     end
+ 
+     local res_init_done = false
+     function NetworkMgr:isConnected()
+-        local is_connected = self:isWifiOn() and self:hasDefaultRoute()
++        local is_connected = isAssociated() and self:hasDefaultRoute()
+ 
+         if is_connected then
+             if not res_init_done then

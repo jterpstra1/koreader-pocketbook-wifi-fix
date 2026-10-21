@@ -61,6 +61,8 @@ So `net off` (which Lomig's teardown uses) must not be part of KOReader's "off".
   - Logs its decision (setting, who turned Wi-Fi on, radio and association state) on every sleep.
   - Powers down synchronously from `Device:_beforeSuspend()`, which is robust either way.
 - **Lesson:** a branch that does nothing should still log why.
+- **0.6.2 sleep test, with the setting ticked: passed.** The suspend decision was logged, then `powering the radio down`. `WiFiPower(0)` took 2633 ms there, against ~30 ms elsewhere, and the device waited for it before sleeping. After the wake the radio was still off.
+- Note: `QueryNetwork()` already reported "not associated" at the sleep moment, 4 s after a successful connect. It's harmless, since the decision uses the radio state.
 - **0.6.0** powers down synchronously in the `Suspend` handler, with `WiFiPower(0)` + `netagent wifi off` and no `disconnect`. This is the same thing PocketBook does when its own picker is cancelled, and connects afterwards worked in the logs. Exit uses the same path, so the 3.6 s exit delay is gone.
 - **A failed connect left no teardown in the log (0.5.0).** In the same log, a `NetConnect` failure (flaky hotspot, picker cancelled) was followed by no `turnOffWifi()` at all. The likely cause is a caller that ignores `turnOnWifi()`'s `false`, such as a plugin's own Wi-Fi toggle. The picker's own `wifi off` covered it that time. Since 0.6.1, `turnOnWifi()` powers down by itself on failure.
 - **Not yet observed:** 0.6.x on a device, and the inactivity timer.

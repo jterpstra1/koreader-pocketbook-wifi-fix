@@ -4,7 +4,7 @@ A KOReader userpatch for PocketBook e-readers. With it, **turning Wi-Fi off in K
 
 It addresses [koreader/koreader#12705](https://github.com/koreader/koreader/issues/12705) and the PocketBook side of [#14537](https://github.com/koreader/koreader/issues/14537).
 
-> **Status: beta (0.6.0).** It was developed against real crash.logs from one device, an InkPad Color 3 on FW 6.10. See [what's verified](#whats-verified). Reports from other models are very welcome: [open a device report](../../issues/new?template=device-report.md).
+> **Status: beta (0.6.1).** It was developed against real crash.logs from one device, an InkPad Color 3 on FW 6.10. See [what's verified](#whats-verified). Reports from other models are very welcome: [open a device report](../../issues/new?template=device-report.md).
 
 ## The problem
 
@@ -30,7 +30,7 @@ All changes are PocketBook-only:
 1. Download [`patches/2-pocketbook-wifi.lua`](patches/2-pocketbook-wifi.lua). Use the *raw* file, not the GitHub web page.
 2. Copy it to `applications/koreader/patches/` on the device. Create the folder if needed.
 3. **Remove other Wi-Fi patches that override the same functions.** In particular, remove Lomig's `2-pocketbook-wifi-off.lua` and `2-pocketbook-wifi-silent-connect.lua`, and any older copy of this file.
-4. Restart KOReader. `applications/koreader/crash.log` should contain `PB Wi-Fi patch 0.6.0 active`.
+4. Restart KOReader. `applications/koreader/crash.log` should contain `PB Wi-Fi patch 0.6.1 active`.
 
 To uninstall, delete the file and restart. You can also disable it under *Tools → Patch management*.
 

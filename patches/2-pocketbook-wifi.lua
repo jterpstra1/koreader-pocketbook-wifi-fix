@@ -51,7 +51,7 @@ first: they override the same functions. His footer icon patch is not needed
 (use the reader footer's Wi-Fi item), but is harmless alongside this one.
 --]]
 
-local PATCH_VERSION = "0.6.0"
+local PATCH_VERSION = "0.6.1"
 
 local Device = require("device")
 if not Device:isPocketBook() or not Device:hasWifiToggle() then return end
@@ -269,7 +269,10 @@ function NetworkMgr:turnOnWifi(complete_callback, interactive)
     timed("WiFiPower(1)", inkview.WiFiPower, 1)
     if timed("NetConnect", inkview.NetConnect, nil) ~= C.NET_OK then
         logger.info("PB Wi-Fi: NetConnect failed (no known network, or picker cancelled)")
-        -- enableWifi() & co. then abort the attempt, which powers the radio down.
+        -- Power down here rather than rely on the caller: enableWifi() & co.
+        -- abort on `false` (a second turnOffWifi() is harmless), but plugins
+        -- calling turnOnWifi() directly may ignore it.
+        self:turnOffWifi()
         return false
     end
     if keepWifiAlive then keepWifiAlive() end

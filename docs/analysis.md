@@ -57,7 +57,8 @@ So `net off` (which Lomig's teardown uses) must not be part of KOReader's "off".
 - **Exit:** the radio was powered down. The synchronous `netagent disconnect` took ~3.6 s here, which delays a restart by that much.
 - **Sleep (0.5.0): failed.** `Suspend` was logged (`Inhibiting user input`), and then nothing until the wake 81 s later. The firmware froze KOReader immediately, so 0.5.0's delayed power-down never ran. A connectivity check that was still pending (flaky hotspot) made it wait on top of that.
 - **0.6.0** powers down synchronously in the `Suspend` handler, with `WiFiPower(0)` + `netagent wifi off` and no `disconnect`. This is the same thing PocketBook does when its own picker is cancelled, and connects afterwards worked in the logs. Exit uses the same path, so the 3.6 s exit delay is gone.
-- **Not yet observed:** 0.6.0 on a device, and the inactivity timer.
+- **A failed connect left no teardown in the log (0.5.0).** In the same log, a `NetConnect` failure (flaky hotspot, picker cancelled) was followed by no `turnOffWifi()` at all. The likely cause is a caller that ignores `turnOnWifi()`'s `false`, such as a plugin's own Wi-Fi toggle. The picker's own `wifi off` covered it that time. Since 0.6.1, `turnOnWifi()` powers down by itself on failure.
+- **Not yet observed:** 0.6.x on a device, and the inactivity timer.
 
 ## 4. Approaches that failed
 

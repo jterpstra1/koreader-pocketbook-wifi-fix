@@ -9,6 +9,8 @@ local USERPATCH_ONLY = {
     "^stock", "own menu", "ordered after", "background/sleep", "Suspend handler",
     "left alone", "exit powers", "can be disabled", "resume cancels", "kosync",
     "manual push", "hasFastWifiStatusQuery", "^sleep:", "^exit:",
+    -- Upstream relies on the documented contract (callers abort on `false`).
+    "caller ignores the result", "single disconnect",
     -- Upstream keeps turn-off synchronous (netagent returned in ~1 s on the InkPad).
     "turning off makes no blocking",
 }
@@ -99,6 +101,23 @@ do
     sim.run(2)
     check("on: cancelled picker powers the radio down within ~2 s", sim.dialogs == 1 and sim.radio == false
         and mgr.pending_connection == false and mgr.pending_connectivity_check == false)
+
+    -- Same, but from a caller that ignores turnOnWifi()'s return value (e.g. a
+    -- plugin's own Wi-Fi toggle): the radio must still go down.
+    mgr = fresh(true, { in_range = false, dialog_result = false })
+    mgr:turnOnWifi(function() end, true)
+    sim.run(2)
+    check("on: failed connect powers down even if the caller ignores the result", sim.radio == false)
+
+    -- And with a caller that does abort: still exactly one teardown.
+    mgr = fresh(true, { in_range = false, dialog_result = false })
+    mgr:toggleWifiOn(nil, false, true)
+    sim.run(2)
+    local disconnects = 0
+    for __, cmd in ipairs(sim.commands) do
+        if cmd:find("netagent disconnect", 1, true) then disconnects = disconnects + 1 end
+    end
+    check("on: failed connect + caller abort runs a single disconnect", disconnects == 1, disconnects)
 
     -- No known network, the user picks one in the picker.
     mgr = fresh(true, { in_range = false, dialog_result = true })

@@ -4,7 +4,7 @@ A KOReader userpatch for PocketBook e-readers. With it, **turning Wi-Fi off in K
 
 It addresses [koreader/koreader#12705](https://github.com/koreader/koreader/issues/12705) and the PocketBook side of [#14537](https://github.com/koreader/koreader/issues/14537).
 
-> **Status: beta (0.6.1).** It was developed against real crash.logs from one device, an InkPad Color 3 on FW 6.10. See [what's verified](#whats-verified). Reports from other models are very welcome: [open a device report](../../issues/new?template=device-report.md).
+> **Status: beta (0.6.2).** It was developed against real crash.logs from one device, an InkPad Color 3 on FW 6.10. See [what's verified](#whats-verified). Reports from other models are very welcome: [open a device report](../../issues/new?template=device-report.md).
 
 ## The problem
 
@@ -27,10 +27,10 @@ All changes are PocketBook-only:
 
 ## Install
 
-1. Download [`patches/2-pocketbook-wifi.lua`](patches/2-pocketbook-wifi.lua). Use the *raw* file, not the GitHub web page.
-2. Copy it to `applications/koreader/patches/` on the device. Create the folder if needed.
-3. **Remove other Wi-Fi patches that override the same functions.** In particular, remove Lomig's `2-pocketbook-wifi-off.lua` and `2-pocketbook-wifi-silent-connect.lua`, and any older copy of this file.
-4. Restart KOReader. `applications/koreader/crash.log` should contain `PB Wi-Fi patch 0.6.1 active`.
+1. Download `koreader-pocketbook-wifi-fix-vX.Y.Z.zip` from the [latest release](../../releases/latest).
+2. Connect the PocketBook over USB and **extract the zip to the root of the device storage**. It contains `applications/koreader/patches/2-pocketbook-wifi.lua`, so the patch lands in the right folder. Alternatively, copy the `.lua` file from the release into `applications/koreader/patches/` yourself.
+3. **Remove other Wi-Fi patches that override the same functions.** In particular, remove Lomig's `2-pocketbook-wifi-off.lua` and `2-pocketbook-wifi-silent-connect.lua`, and any older copy of this file with a different name.
+4. Restart KOReader. `applications/koreader/crash.log` should contain `PB Wi-Fi patch X.Y.Z active`.
 
 To uninstall, delete the file and restart. You can also disable it under *Tools → Patch management*.
 
@@ -57,7 +57,7 @@ Verified on an **InkPad Color 3 (U743k3.6.10.2854)** with KOReader 2026.07.1, fr
 | Off → on again: no prompt, connects in ~1.5 s | ✅ |
 | Wi-Fi off ~6 s after a manual progress-sync push ("Action when done with Wi-Fi: Turn off") | ✅ |
 | Wi-Fi off on exit (only if KOReader turned it on) | ✅ (0.5.0); 0.6.0 makes it faster |
-| Wi-Fi off on sleep / cover close | ❌ in 0.5.0 (the firmware froze KOReader before the delayed power-down ran); 🧪 fixed in 0.6.0, needs re-test |
+| Wi-Fi off on sleep / cover close | ❌ in 0.5.0 and 0.6.1 (the power-down never ran on sleep); 🧪 0.6.2 hooks `Device:_beforeSuspend()` and logs its decision, needs re-test |
 | "Disable Wi-Fi when inactive" on PocketBook | 🧪 simulated only |
 | Any other model or firmware | ❓ please report |
 
@@ -87,13 +87,18 @@ Please [open a device report](../../issues/new?template=device-report.md) with:
 
 ```sh
 pip install lupa
-git clone --depth 1 https://github.com/koreader/koreader ../koreader
-python3 tests/run.py ../koreader                   # the userpatch
-# with upstream/pocketbook-wifi.diff applied to ../koreader:
-python3 tests/run.py --upstream ../koreader
+scripts/test.sh    # pinned KOReader checkout: the userpatch, then upstream/pocketbook-wifi.diff
 ```
 
 A simulation only checks the assumptions it encodes. Field reports are what matter.
+
+## Releasing
+
+1. Bump `PATCH_VERSION` in the patch.
+2. Add a `## vX.Y.Z` section to `CHANGELOG.md`.
+3. Commit, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+CI runs the tests, builds the zip (`scripts/build-release.sh`) and publishes the release. Tags with a suffix (`v0.7.0-rc1`) become pre-releases.
 
 ## Credits
 

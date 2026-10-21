@@ -34,6 +34,11 @@ local function fresh(patched, opts)
     sim.Device.exit = function() sim.Device.exited = sim.Device.exited + 1 end
     sim.Device.exited = 0
     sim.Device.hasFastWifiStatusQuery = function() return false end
+    sim.Device._beforeSuspend = function()
+        sim.suspended = sim.suspended + 1
+        if sim.on_suspend then sim.on_suspend() end
+    end
+    sim.Device._afterResume = function() end
     return sim.load(patched)
 end
 
@@ -229,6 +234,15 @@ do
     sim.UIManager.event_handlers.Suspend()
     check("sleep: radio down before KOReader is frozen (no time passes)", sim.radio == false)
     check("sleep: fast power-down makes no slow blocking call", sim.slow_blocking == 0, sim.slow_blocking)
+
+    -- A plugin installing its own Suspend handler after the patch loaded (the
+    -- suspected 0.6.1 field failure): still powered down, via _beforeSuspend.
+    mgr = fresh(true, {})
+    mgr:toggleWifiOn(nil, false, true)
+    sim.run(3)
+    sim.UIManager.event_handlers.Suspend = function() sim.Device:_beforeSuspend() end
+    sim.UIManager.event_handlers.Suspend()
+    check("sleep: radio down even if a plugin replaced the Suspend handler", sim.radio == false)
 
     -- Same, with a connectivity check still pending (flaky hotspot: associated, no route yet).
     mgr = fresh(true, {})

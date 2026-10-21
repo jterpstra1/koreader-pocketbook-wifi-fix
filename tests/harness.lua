@@ -350,6 +350,12 @@ local Device = {
 }
 Device.initNetworkManager = function(self, mgr) return stock_initNetworkManager()(self, mgr) end
 Device.exit = function() Device.exited = Device.exited + 1 end
+-- Generic: _beforeSuspend broadcasts the Suspend event (kosync listens to it).
+Device._beforeSuspend = function()
+    sim.suspended = sim.suspended + 1
+    if sim.on_suspend then sim.on_suspend() end
+end
+Device._afterResume = function() end
 stub("device", Device)
 
 -- Real userpatch.getUpValue, without the rest of userpatch.lua.
@@ -371,12 +377,10 @@ function sim.load(patched)
     package.loaded["ui/network/manager"] = nil
     sim.suspended, sim.on_suspend = 0, nil
     UIManager.event_handlers = {
-        -- Stand-in for PocketBook's handler, which broadcasts Suspend (kosync listens to it).
-        Suspend = function()
-            sim.suspended = sim.suspended + 1
-            if sim.on_suspend then sim.on_suspend() end
-        end,
-        Resume = function() end,
+        -- PocketBook's handlers: powerd:beforeSuspend()/afterResume() ->
+        -- Device:_beforeSuspend()/_afterResume().
+        Suspend = function() Device:_beforeSuspend() end,
+        Resume = function() Device:_afterResume() end,
     }
     package.path = KO_DIR .. "/frontend/?.lua;" .. package.path
     local mgr = dofile(KO_DIR .. "/frontend/ui/network/manager.lua")

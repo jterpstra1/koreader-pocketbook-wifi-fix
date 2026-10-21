@@ -51,7 +51,7 @@ first: they override the same functions. His footer icon patch is not needed
 (use the reader footer's Wi-Fi item), but is harmless alongside this one.
 --]]
 
-local PATCH_VERSION = "0.6.1"
+local PATCH_VERSION = "0.6.2"
 
 local Device = require("device")
 if not Device:isPocketBook() or not Device:hasWifiToggle() then return end
@@ -249,9 +249,11 @@ local NET_OFF_SYNC_WAIT = 5 -- seconds
 
 function NetworkMgr:turnOnWifi(complete_callback, interactive)
     generation = generation + 1
-    if not radioUp() then
+    local radio_was_up = radioUp()
+    if not radio_was_up then
         we_powered_on = true
     end
+    logger.info("PB Wi-Fi: turning on; radio already up =", radio_was_up, "KOReader turned it on =", we_powered_on)
 
     -- A `netagent disconnect` from a turnOffWifi() just before must not race the
     -- connect. Rare (off then on within ~1 s), so a short blocking wait is fine.
@@ -360,12 +362,22 @@ local function watchSuspend()
     UIManager:scheduleIn(0, suspend_watch)
 end
 
-local orig_suspend = UIManager.event_handlers.Suspend
-UIManager.event_handlers.Suspend = function(...)
+-- NOTE: Hook Device:_beforeSuspend()/_afterResume() rather than
+--       UIManager.event_handlers.Suspend/Resume: every suspend path ends up
+--       there (it's what broadcasts the Suspend event and logs "Inhibiting
+--       user input"), while wrapping the handler table proved unreliable in
+--       the field (0.6.1: the wrapper never ran).
+local orig_beforeSuspend = Device._beforeSuspend
+Device._beforeSuspend = function(...)
     local was_connecting = NetworkMgr.pending_connection
-    local ret
-    if orig_suspend then ret = orig_suspend(...) end
-    if shouldPowerDown("pocketbook_wifi_off_on_suspend") then
+    -- Broadcasts Suspend: kosync auto sync may start connecting from here.
+    local ret = orig_beforeSuspend(...)
+    local enabled = G_reader_settings:nilOrTrue("pocketbook_wifi_off_on_suspend")
+    local wifi_on = NetworkMgr:isWifiOn()
+    logger.info("PB Wi-Fi: suspend: KOReader turned Wi-Fi on =", we_powered_on, "setting =", enabled,
+        "Wi-Fi on =", wifi_on, "radio up =", radioUp(), "associated =", isAssociated(),
+        "connecting =", NetworkMgr.pending_connection)
+    if we_powered_on and enabled and wifi_on then
         if NetworkMgr.pending_connection and not was_connecting then
             logger.info("PB Wi-Fi: going to sleep/background while a sync connects, powering down once it's done")
             watchSuspend()
@@ -377,10 +389,10 @@ UIManager.event_handlers.Suspend = function(...)
 end
 
 -- Back in the foreground before a delayed power-down ran: leave Wi-Fi alone.
-local orig_resume = UIManager.event_handlers.Resume
-UIManager.event_handlers.Resume = function(...)
+local orig_afterResume = Device._afterResume
+Device._afterResume = function(...)
     cancelSuspendWatch()
-    if orig_resume then return orig_resume(...) end
+    return orig_afterResume(...)
 end
 
 local orig_exit = Device.exit

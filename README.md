@@ -4,7 +4,7 @@ A KOReader userpatch for PocketBook e-readers. With it, **turning Wi-Fi off in K
 
 It addresses [koreader/koreader#12705](https://github.com/koreader/koreader/issues/12705) and the PocketBook side of [#14537](https://github.com/koreader/koreader/issues/14537).
 
-> **Status: beta (0.5.0).** It was developed against real crash.logs from one device, an InkPad Color 3 on FW 6.10. See [what's verified](#whats-verified). Reports from other models are very welcome: [open a device report](../../issues/new?template=device-report.md).
+> **Status: beta (0.6.0).** It was developed against real crash.logs from one device, an InkPad Color 3 on FW 6.10. See [what's verified](#whats-verified). Reports from other models are very welcome: [open a device report](../../issues/new?template=device-report.md).
 
 ## The problem
 
@@ -23,14 +23,14 @@ All changes are PocketBook-only:
 3. **Wi-Fi state is reported correctly:** *on* means the radio is powered, *connected* means associated. KOReader's own "connect or turn off?" prompt and the reader footer's Wi-Fi item then work.
 4. **"Disable Wi-Fi connection when inactive" (Network menu) becomes available.** It turns Wi-Fi off after ~5 min without traffic, which is useful after OPDS downloads.
 5. **After a manual progress-sync push or pull** that had to turn Wi-Fi on, the patch applies your *Action when done with Wi-Fi* setting about 6 s later.
-6. **Sleep, cover close, leaving KOReader, or exit:** if KOReader turned Wi-Fi on, it is powered down once any running sync has finished. Wi-Fi you turned on in the PocketBook settings is left alone.
+6. **Sleep, cover close, leaving KOReader, or exit:** if KOReader turned Wi-Fi on, the radio is powered down right away (in ~60 ms, before the firmware freezes KOReader). Wi-Fi you turned on in the PocketBook settings is left alone.
 
 ## Install
 
 1. Download [`patches/2-pocketbook-wifi.lua`](patches/2-pocketbook-wifi.lua). Use the *raw* file, not the GitHub web page.
 2. Copy it to `applications/koreader/patches/` on the device. Create the folder if needed.
 3. **Remove other Wi-Fi patches that override the same functions.** In particular, remove Lomig's `2-pocketbook-wifi-off.lua` and `2-pocketbook-wifi-silent-connect.lua`, and any older copy of this file.
-4. Restart KOReader. `applications/koreader/crash.log` should contain `PB Wi-Fi patch 0.5.0 active`.
+4. Restart KOReader. `applications/koreader/crash.log` should contain `PB Wi-Fi patch 0.6.0 active`.
 
 To uninstall, delete the file and restart. You can also disable it under *Tools → Patch management*.
 
@@ -56,8 +56,8 @@ Verified on an **InkPad Color 3 (U743k3.6.10.2854)** with KOReader 2026.07.1, fr
 | No UI freeze on Wi-Fi off | ✅ |
 | Off → on again: no prompt, connects in ~1.5 s | ✅ |
 | Wi-Fi off ~6 s after a manual progress-sync push ("Action when done with Wi-Fi: Turn off") | ✅ |
-| Wi-Fi off on exit (only if KOReader turned it on) | ✅ |
-| Wi-Fi off on sleep / cover close | 🧪 simulated only |
+| Wi-Fi off on exit (only if KOReader turned it on) | ✅ (0.5.0); 0.6.0 makes it faster |
+| Wi-Fi off on sleep / cover close | ❌ in 0.5.0 (the firmware froze KOReader before the delayed power-down ran); 🧪 fixed in 0.6.0, needs re-test |
 | "Disable Wi-Fi when inactive" on PocketBook | 🧪 simulated only |
 | Any other model or firmware | ❓ please report |
 
@@ -67,7 +67,7 @@ Other users have reported the same radio-stays-on bug on the Era, Era Lite, Vers
 
 - **Connecting blocks KOReader**, as in stock: ~1.5 s at home, or while the system network picker is open. All attempts to connect without `NetConnect()` failed on the InkPad Color 3; see [docs/analysis.md](docs/analysis.md#approaches-that-failed).
 - **Leaving KOReader also counts as "background".** PocketBook sends the same event for sleep and for switching apps (library, browser). If KOReader turned Wi-Fi on, switching apps turns it off. You can disable this in the menu.
-- **Some models freeze KOReader a few seconds into sleep.** If that happens before the power-down runs, it runs on the next wake instead.
+- **The firmware freezes KOReader right after the sleep event** (immediately on the InkPad Color 3). The power-down therefore happens synchronously in that event. The one exception is kosync *auto-sync*: when the sleep event itself starts a sync connection, the power-down waits for the sync, so on such devices it only happens on the next wake.
 - **A sync push away from known networks** shows the system picker. That push isn't queued; push again later.
 
 ## Reporting results

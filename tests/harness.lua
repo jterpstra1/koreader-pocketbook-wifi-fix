@@ -38,6 +38,7 @@ function sim.reset(opts)
     sim.net_disabled = opts.net_disabled or false
     sim.accept_enable_prompt = opts.accept_enable_prompt or false
     sim.enable_prompts = 0
+    sim.slow_blocking = 0   -- blocking `netagent disconnect` / NetDisconnect (3.5+ s)
     sim.blocking = 0        -- blocking inkview connect calls + synchronous netagent runs
     sim.blocking_connect = 0 -- blocking NetConnect/NetConnectSilent calls only (the ~28 s freeze)
     sim.files = {}
@@ -105,7 +106,12 @@ local inkview = {
         return -1
     end,
     -- Runs `netagent disconnect` and waits for it (took 3.7 s once on the InkPad).
-    NetDisconnect = function() sim.blocking = sim.blocking + 1; sim.associated = false; return 0 end,
+    NetDisconnect = function()
+        sim.blocking = sim.blocking + 1
+        sim.slow_blocking = sim.slow_blocking + 1
+        sim.associated = false
+        return 0
+    end,
     QueryNetwork = function()
         tick_assoc()
         return sim.associated and 3840 or 0
@@ -148,7 +154,11 @@ os.execute = function(cmd)
     if cmd:find("timeout -?t? ?1 true") then return 0 end
     local bg = cmd:find("&%s*$") ~= nil
     local marker = cmd:match("touch (%S+)%)")
-    if cmd:find("netagent", 1, true) and not bg then sim.blocking = sim.blocking + 1 end
+    if cmd:find("netagent", 1, true) and not bg then
+        sim.blocking = sim.blocking + 1
+        -- `disconnect` took 3.5+ s on the InkPad; `wifi off` ~30 ms.
+        if cmd:find("netagent disconnect", 1, true) then sim.slow_blocking = sim.slow_blocking + 1 end
+    end
     local is_connect = cmd:find("netagent connect", 1, true) ~= nil
     local function apply()
         if cmd:find("netagent disconnect", 1, true) then sim.associated = false end

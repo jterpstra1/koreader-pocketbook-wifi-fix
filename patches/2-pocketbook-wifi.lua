@@ -37,7 +37,8 @@ What this changes, all PocketBook-only:
    reader footer's Wi-Fi item becomes available.
 
 6. If KOReader powered the radio up itself, it powers it down again when
-   KOReader goes to the background/sleep and on exit. Both are toggleable
+   KOReader goes to the background/sleep and on exit, synchronously (the
+   firmware may freeze KOReader right after the sleep event). Both are toggleable
    under Network -> "PocketBook: Wi-Fi off when leaving KOReader".
 
 7. Progress sync (kosync): a manual push/pull that had to turn Wi-Fi on now
@@ -50,7 +51,7 @@ first: they override the same functions. His footer icon patch is not needed
 (use the reader footer's Wi-Fi item), but is harmless alongside this one.
 --]]
 
-local PATCH_VERSION = "0.5.0"
+local PATCH_VERSION = "0.6.0"
 
 local Device = require("device")
 if not Device:isPocketBook() or not Device:hasWifiToggle() then return end
@@ -185,7 +186,16 @@ local function afterNetOff(my_generation, done)
     check()
 end
 
-function NetworkMgr:turnOffWifi(complete_callback, sync)
+-- Set while powering down on sleep/exit: see turnOffWifi().
+local fast_teardown = false
+
+-- `fast`: just cut the radio, synchronously (~60 ms): WiFiPower(0) and
+-- `netagent wifi off`, without `netagent disconnect` (3.5+ s). That's what
+-- PocketBook itself does when its network picker is cancelled, and the next
+-- connect works fine. Used on sleep and exit, where the firmware freezes or
+-- ends KOReader right after, so nothing can be left for later.
+function NetworkMgr:turnOffWifi(complete_callback, fast)
+    fast = fast or fast_teardown
     generation = generation + 1
     local my_generation = generation
     we_powered_on = false
@@ -196,7 +206,7 @@ function NetworkMgr:turnOffWifi(complete_callback, sync)
     local function finish()
         timed("WiFiPower(0)", inkview.WiFiPower, 0)
         -- Some units keep the radio up after WiFiPower(0) alone; a no-op on others.
-        if sync then netagentSync("wifi off") else netagentBackground("wifi off") end
+        if fast then netagentSync("wifi off") else netagentBackground("wifi off") end
         logger.info("PB Wi-Fi: radio powered down; QueryNetwork =", inkview.QueryNetwork(),
             "radio up =", radioUp())
         if complete_callback then
@@ -204,16 +214,15 @@ function NetworkMgr:turnOffWifi(complete_callback, sync)
         end
     end
 
+    if fast then
+        return finish()
+    end
     if not has_netagent then
         timed("NetDisconnect", inkview.NetDisconnect)
         return finish()
     end
     -- NOTE: NetDisconnect() just runs `netagent disconnect` and waits for it
     --       (3.7 s once on an InkPad Color 3), so run that ourselves.
-    if sync then
-        netagentSync("disconnect")
-        return finish()
-    end
 
     -- Same order (disconnect, then WiFiPower(0)), without blocking the UI on netagent.
     if not net_off_pending then
@@ -296,10 +305,14 @@ local function shouldPowerDown(setting)
     return we_powered_on and G_reader_settings:nilOrTrue(setting) and NetworkMgr:isWifiOn()
 end
 
--- The Suspend event is what makes kosync (auto sync) push progress, which
--- brings Wi-Fi *up*. So power down only once that has settled: wait for the
--- connection attempt to finish, then leave async requests (kosync's progress
--- timeout is 5 s) a few seconds to complete.
+-- On PocketBook, Suspend means sleep, cover close or switching apps. The
+-- firmware can freeze KOReader right after it (InkPad Color 3: immediately),
+-- so power down synchronously, from the handler itself.
+--
+-- Exception: something reacting to the Suspend event (kosync auto sync) has
+-- just brought Wi-Fi up to push progress. Then power down once that has
+-- settled, as a best effort: on devices that freeze right away this only runs
+-- on the next wake.
 local SUSPEND_SETTLE_MAX = 20
 local SUSPEND_GRACE = 4
 local suspend_watch
@@ -309,6 +322,14 @@ local function cancelSuspendWatch()
         UIManager:unschedule(suspend_watch)
         suspend_watch = nil
     end
+end
+
+local function powerDownNow(reason)
+    cancelSuspendWatch()
+    logger.info("PB Wi-Fi:", reason, "- powering the radio down")
+    fast_teardown = true
+    NetworkMgr:disableWifi()
+    fast_teardown = false
 end
 
 local function watchSuspend()
@@ -331,22 +352,28 @@ local function watchSuspend()
             UIManager:scheduleIn(SUSPEND_GRACE, suspend_watch)
             return
         end
-        suspend_watch = nil
-        logger.info("PB Wi-Fi: in background/asleep, powering the radio down")
-        NetworkMgr:disableWifi()
+        powerDownNow("sync on sleep/background done")
     end
     UIManager:scheduleIn(0, suspend_watch)
 end
 
 local orig_suspend = UIManager.event_handlers.Suspend
 UIManager.event_handlers.Suspend = function(...)
+    local was_connecting = NetworkMgr.pending_connection
     local ret
     if orig_suspend then ret = orig_suspend(...) end
-    watchSuspend()
+    if shouldPowerDown("pocketbook_wifi_off_on_suspend") then
+        if NetworkMgr.pending_connection and not was_connecting then
+            logger.info("PB Wi-Fi: going to sleep/background while a sync connects, powering down once it's done")
+            watchSuspend()
+        else
+            powerDownNow("going to sleep/background")
+        end
+    end
     return ret
 end
 
--- Back in the foreground before the radio went down: leave it alone.
+-- Back in the foreground before a delayed power-down ran: leave Wi-Fi alone.
 local orig_resume = UIManager.event_handlers.Resume
 UIManager.event_handlers.Resume = function(...)
     cancelSuspendWatch()
@@ -357,7 +384,7 @@ local orig_exit = Device.exit
 Device.exit = function(...)
     if shouldPowerDown("pocketbook_wifi_off_on_exit") then
         logger.info("PB Wi-Fi: exiting, powering the radio down")
-        NetworkMgr:turnOffWifi(nil, true) -- no event loop left to wait in
+        NetworkMgr:turnOffWifi(nil, true) -- fast: no event loop left to wait in
     end
     return orig_exit(...)
 end

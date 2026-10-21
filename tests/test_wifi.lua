@@ -8,7 +8,7 @@ local sim = dofile(TESTS_DIR .. "/harness.lua")
 local USERPATCH_ONLY = {
     "^stock", "own menu", "ordered after", "background/sleep", "Suspend handler",
     "left alone", "exit powers", "can be disabled", "resume cancels", "kosync",
-    "manual push", "hasFastWifiStatusQuery",
+    "manual push", "hasFastWifiStatusQuery", "^sleep:", "^exit:",
     -- Upstream keeps turn-off synchronous (netagent returned in ~1 s on the InkPad).
     "turning off makes no blocking",
 }
@@ -200,6 +200,31 @@ do
 end
 
 ---------------------------------------------------------------- leaving KOReader
+-- On the InkPad Color 3 the firmware freezes KOReader right after the Suspend
+-- event (crash.log: nothing logged between "Inhibiting user input" and the
+-- wake), so anything scheduled for later doesn't run before sleep.
+do
+    local mgr = fresh(true, {})
+    mgr:toggleWifiOn(nil, false, true)
+    sim.run(3)
+    sim.UIManager.event_handlers.Suspend()
+    check("sleep: radio down before KOReader is frozen (no time passes)", sim.radio == false)
+    check("sleep: fast power-down makes no slow blocking call", sim.slow_blocking == 0, sim.slow_blocking)
+
+    -- Same, with a connectivity check still pending (flaky hotspot: associated, no route yet).
+    mgr = fresh(true, {})
+    mgr:toggleWifiOn(nil, false, true)
+    mgr.pending_connectivity_check = true
+    sim.UIManager.event_handlers.Suspend()
+    check("sleep: radio down even with a stale connectivity check pending", sim.radio == false)
+
+    mgr = fresh(true, {})
+    mgr:toggleWifiOn(nil, false, true)
+    sim.run(3)
+    sim.Device.exit()
+    check("exit: fast power-down, no slow netagent disconnect", sim.radio == false and sim.slow_blocking == 0, sim.slow_blocking)
+end
+
 do
     local mgr = fresh(true, {})
     mgr:toggleWifiOn(nil, false, true)
@@ -230,14 +255,16 @@ do
     sim.run(30)
     check("leaving: background power-down can be disabled", sim.radio == true)
 
+    -- kosync auto-sync connecting on Suspend, then woken up again within a second:
+    -- the delayed power-down is cancelled (kosync pulls on resume).
     mgr = fresh(true, {})
-    mgr:toggleWifiOn(nil, false, true)
-    sim.run(3)
+    sim.settings.wifi_enable_action = "turn_on"
+    sim.on_suspend = function() mgr:willRerunWhenOnline(function() end) end
     sim.UIManager.event_handlers.Suspend()
     sim.run(1)
     sim.UIManager.event_handlers.Resume()
     sim.run(30)
-    check("leaving: resume cancels the pending power-down", sim.radio == true)
+    check("leaving: resume cancels the delayed (auto-sync) power-down", sim.radio == true)
 
     -- kosync auto-sync: the Suspend event itself brings Wi-Fi up to push progress.
     mgr = fresh(true, {})

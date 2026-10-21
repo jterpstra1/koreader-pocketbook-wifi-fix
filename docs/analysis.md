@@ -28,7 +28,7 @@ Against KOReader master `426e932` (2026-10-20). Tracking issue: [koreader/koread
 ### Userpatch only (policy choices, or plugin-specific)
 
 - **Background turn-off.** The teardown's netagent steps run in the background, in order, with a marker file between them. `NetDisconnect()` once blocked for 3.7 s.
-- **Power-down on `Suspend`.** On PocketBook, `Suspend` means sleep, cover close or app switch. If KOReader brought Wi-Fi up, the patch waits for pending connections to settle, plus 4 s for async requests, then powers down. `Resume` cancels a pending power-down.
+- **Power-down on `Suspend`.** On PocketBook, `Suspend` means sleep, cover close or app switch. If KOReader brought Wi-Fi up, the patch powers the radio down synchronously in the handler, because the firmware may freeze KOReader right after it. The exception: if the event itself started a connection (kosync auto-sync), the patch waits for it to settle, plus 4 s, and `Resume` cancels that delayed power-down.
 - **Power-down on exit**, under the same condition.
 - **kosync bracket.** An interactive push or pull that went through `beforeWifiAction` is followed by `afterWifiAction()` after 6 s. kosync's progress timeout is 5 s, and kosync also drains its queue and pulls on `NetworkConnected`.
 - **A menu entry** for the two leave-KOReader toggles.
@@ -55,7 +55,9 @@ So `net off` (which Lomig's teardown uses) must not be part of KOReader's "off".
 - **Off → on:** no prompt, and `NetConnect` took 1516 ms. Turning off ran `disconnect` in the background (3.25 s) with no UI freeze.
 - **Manual kosync push:** connected, then `afterWifiAction` ran 6 s later, and the radio was down 5 s after that.
 - **Exit:** the radio was powered down. The synchronous `netagent disconnect` took ~3.6 s here, which delays a restart by that much.
-- **Not yet observed:** the power-down on sleep, and the inactivity timer.
+- **Sleep (0.5.0): failed.** `Suspend` was logged (`Inhibiting user input`), and then nothing until the wake 81 s later. The firmware froze KOReader immediately, so 0.5.0's delayed power-down never ran. A connectivity check that was still pending (flaky hotspot) made it wait on top of that.
+- **0.6.0** powers down synchronously in the `Suspend` handler, with `WiFiPower(0)` + `netagent wifi off` and no `disconnect`. This is the same thing PocketBook does when its own picker is cancelled, and connects afterwards worked in the logs. Exit uses the same path, so the 3.6 s exit delay is gone.
+- **Not yet observed:** 0.6.0 on a device, and the inactivity timer.
 
 ## 4. Approaches that failed
 

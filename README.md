@@ -69,6 +69,8 @@ Other users have reported the same radio-stays-on bug on the Era, Era Lite, Vers
 - **Leaving KOReader also counts as "background".** PocketBook sends the same event for sleep and for switching apps (library, browser). If KOReader turned Wi-Fi on, switching apps turns it off. You can disable this in the menu.
 - **The firmware freezes KOReader right after the sleep event** (immediately on the InkPad Color 3). The power-down therefore happens synchronously in that event. The one exception is kosync *auto-sync*: when the sleep event itself starts a sync connection, the power-down waits for the sync, so on such devices it only happens on the next wake.
 - **A sync push away from known networks** shows the system picker. That push isn't queued; push again later.
+- **The power-down on sleep runs after the other plugins have handled the sleep event.** That's deliberate: plugins that sync on sleep, like kosync auto-sync, need Wi-Fi at that moment. The flip side is that a plugin which blocks in its sleep handler also delays the power-down. Seen in the field: Storefront hung for over 3 hours while cancelling a stuck catalog download, with Wi-Fi on and the device unable to sleep.
+- **Set PocketBook's *Auto screen lock* to a few minutes** (Settings → Maintenance → Saving Power). Otherwise the device only sleeps on cover close or the power button. If that one signal is missed, for example a button pressed by accident while the cover is closed, it stays awake all night. The patch can't help there: it only acts on the sleep event.
 
 ## Reporting results
 
